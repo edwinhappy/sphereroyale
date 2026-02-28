@@ -28,22 +28,5 @@ export const initRedis = async () => {
     console.log('✅ Connected to Redis (Pub/Sub)');
 };
 
-let lastPubErrorAt = 0;
-let lastSubErrorAt = 0;
-const ERROR_LOG_COOLDOWN_MS = 5_000;
-
-pubClient.on('error', (err: unknown) => {
-    const now = Date.now();
-    if (now - lastPubErrorAt >= ERROR_LOG_COOLDOWN_MS) {
-        console.error('Redis Pub Client Error:', err);
-        lastPubErrorAt = now;
-    }
-});
-
-subClient.on('error', (err: unknown) => {
-    const now = Date.now();
-    if (now - lastSubErrorAt >= ERROR_LOG_COOLDOWN_MS) {
-        console.error('Redis Sub Client Error:', err);
-        lastSubErrorAt = now;
-    }
-});
+pubClient.on('error', (err: unknown) => console.error('Redis Pub Client Error:', err));
+subClient.on('error', (err: unknown) => console.error('Redis Sub Client Error:', err));

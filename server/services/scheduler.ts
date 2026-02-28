@@ -16,7 +16,7 @@ export const agenda = new Agenda({
 // Job Definitions
 // ---------------------------------------------------------------------------
 
-agenda.define('start-game', async (_job) => {
+agenda.define('start-game', async (_job: unknown) => {
     console.log(`[Agenda] Executing scheduled job: 'start-game'`);
 
     // Explicit State Machine Guard

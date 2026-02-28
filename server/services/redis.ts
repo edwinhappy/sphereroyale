@@ -17,5 +17,5 @@ export const initRedis = async () => {
     }
 };
 
-pubClient.on('error', (err) => console.error('Redis Pub Client Error:', err));
-subClient.on('error', (err) => console.error('Redis Sub Client Error:', err));
+pubClient.on('error', (err: unknown) => console.error('Redis Pub Client Error:', err));
+subClient.on('error', (err: unknown) => console.error('Redis Sub Client Error:', err));

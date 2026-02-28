@@ -119,12 +119,23 @@ setInterval(async () => {
 }, 1000);
 
 let lastTime = Date.now();
-setInterval(() => {
-    if (!isLeader) return; // Only the leader runs the physics loop
+let accumulatorMs = 0;
+const PHYSICS_STEP_MS = 50;
+const MAX_DT_MS = 250;
 
+setInterval(() => {
     const now = Date.now();
-    const dt = now - lastTime;
+
+    if (!isLeader) {
+        // Reset timing while not leader to avoid massive dt spike on leadership handoff.
+        lastTime = now;
+        accumulatorMs = 0;
+        return;
+    }
+
+    const frameDtMs = Math.min(now - lastTime, MAX_DT_MS);
     lastTime = now;
+    accumulatorMs += frameDtMs;
 
     if (serverGameState.status === GameStatus.PLAYING) {
         const context: BackendPhysicsContext = {
@@ -133,7 +144,6 @@ setInterval(() => {
             setGameStatus: (s) => { serverGameState.status = s; },
             onEvent: (ev) => {
                 io.emit('gameEvent', ev);
-                // Persist key events to Match doc
                 if (['eliminated', 'win', 'draw'].includes(ev.type)) {
                     const text = ev.type === 'win' ? `Winner: ${ev.winner}`
                         : ev.type === 'draw' ? 'Match ended in a draw'
@@ -146,7 +156,10 @@ setInterval(() => {
             }
         };
 
-        updateServerPhysicsEngine(dt, context);
+        while (accumulatorMs >= PHYSICS_STEP_MS && serverGameState.status === GameStatus.PLAYING) {
+            updateServerPhysicsEngine(PHYSICS_STEP_MS, context);
+            accumulatorMs -= PHYSICS_STEP_MS;
+        }
         serverGameState.spheres = context.currentSpheres;
 
         // Read current status after physics update (setGameStatus may have changed it)

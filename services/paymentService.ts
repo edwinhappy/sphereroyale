@@ -1,4 +1,4 @@
-import { beginCell, Address } from '@ton/core';
+import { beginCell, Address, Cell } from '@ton/core';
 import type { TonConnectUI } from '@tonconnect/ui-react';
 import {
     Connection,
@@ -74,7 +74,16 @@ export async function sendTonUSDT(
     };
 
     const result = await tonConnectUI.sendTransaction(transaction);
-    return result.boc;
+    if (result?.boc) {
+        try {
+            const bocCell = Cell.fromBase64(result.boc);
+            return bocCell.hash().toString('hex');
+        } catch {
+            return result.boc;
+        }
+    }
+
+    throw new Error('TON wallet did not return a transaction payload');
 }
 
 /**

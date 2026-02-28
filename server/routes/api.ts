@@ -35,6 +35,29 @@ router.get('/game/current', (_req: Request, res: Response) => {
     res.json({ gameId });
 });
 
+
+// POST /api/auth/participant
+router.post('/auth/participant', async (req: Request, res: Response): Promise<any> => {
+    try {
+        const username = String(req.body?.username || '').trim().toLowerCase();
+        if (!username) {
+            return res.status(400).json({ error: 'Username is required' });
+        }
+
+        const gameId: string = (global as any).__currentGameId || 'default';
+        const participant = await Participant.findOne({ username, gameId, status: 'CONFIRMED' }).lean();
+
+        if (!participant) {
+            return res.status(404).json({ error: 'Participant not found for current game' });
+        }
+
+        return res.json({ ok: true, username: participant.username, gameId });
+    } catch (error) {
+        console.error('Participant auth error:', error);
+        return res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
 // POST /api/register
 router.post('/register', registerLimiter, validate(registerSchema), async (req: Request, res: Response): Promise<any> => {
     try {
@@ -180,22 +203,30 @@ router.post('/schedule', requireAdmin, validate(scheduleSchema), async (req: Req
     try {
         const { nextGameTime, totalPlayers } = req.body;
 
-        const updated = await Schedule.findOneAndUpdate(
-            { type: 'main' },
-            { nextGameTime: new Date(nextGameTime), totalPlayers, updatedAt: new Date() },
-            { upsert: true, new: true }
-        );
+        let updated;
 
-        // Update Agenda Job Queue
         if (nextGameTime) {
-            await scheduleGameStart(new Date(nextGameTime));
+            const nextDate = new Date(nextGameTime);
+            updated = await Schedule.findOneAndUpdate(
+                { type: 'main' },
+                { nextGameTime: nextDate, totalPlayers, updatedAt: new Date() },
+                { upsert: true, new: true }
+            );
+            await scheduleGameStart(nextDate);
         } else {
+            updated = await Schedule.findOneAndUpdate(
+                { type: 'main' },
+                { nextGameTime: null, totalPlayers, updatedAt: new Date() },
+                { upsert: true, new: true }
+            );
             await cancelScheduledGames();
         }
 
         if (req.io) {
-            req.io.emit('scheduleUpdated', updated);
-            req.io.emit('systemLog', `Admin updated schedule: ${nextGameTime} for ${totalPlayers}`);
+            req.io.emit('scheduleUpdated', { nextGameTime: updated?.nextGameTime ?? null, totalPlayers: updated?.totalPlayers ?? totalPlayers });
+            req.io.emit('systemLog', nextGameTime
+                ? `Admin updated schedule: ${new Date(nextGameTime).toISOString()} for ${totalPlayers}`
+                : `Admin cleared schedule. Total players set to ${totalPlayers}`);
         }
 
         res.json(updated);

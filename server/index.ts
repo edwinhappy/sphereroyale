@@ -81,13 +81,18 @@ export let serverGameState = {
     spheres: [] as Sphere[],
     nextGameTime: null as Date | null,
     totalPlayers: 8,
-    currentGameId: 'default',
+    currentGameId: `game-${Date.now()}`,
     /** Track the previous status so we can detect transitions in the game loop */
     _prevStatus: GameStatus.IDLE as GameStatus,
 };
 
 // Expose currentGameId globally so routes can access it without circular imports
 (global as any).__currentGameId = serverGameState.currentGameId;
+
+function rotateGameId() {
+    serverGameState.currentGameId = `game-${Date.now()}`;
+    (global as any).__currentGameId = serverGameState.currentGameId;
+}
 
 // Game Loop Leader Election
 let isLeader = false;
@@ -164,7 +169,10 @@ setInterval(() => {
                     isDraw,
                     ...(winner ? { winner } : {}),
                 },
-            ).catch(e => console.error('Failed to persist match result:', e));
+            ).then(() => {
+                // Open registrations for the next round.
+                rotateGameId();
+            }).catch(e => console.error('Failed to persist match result:', e));
         }
         serverGameState._prevStatus = serverGameState.status;
 
@@ -183,10 +191,6 @@ export async function startGameSequence() {
         console.warn(`⚠️ Blocked duplicate startGameSequence. Current status: ${serverGameState.status}`);
         return;
     }
-    // Generate a new gameId for this round
-    serverGameState.currentGameId = `game-${Date.now()}`;
-    (global as any).__currentGameId = serverGameState.currentGameId;
-
     serverGameState.status = GameStatus.GENERATING;
     serverGameState._prevStatus = GameStatus.GENERATING;
     io.emit('gameEvent', { type: 'info', text: 'INITIALIZING PROTOCOL...' });
@@ -338,6 +342,7 @@ io.on('connection', (socket: Socket) => {
             serverGameState.status = GameStatus.IDLE;
 
             serverGameState.spheres = [];
+            rotateGameId();
 
             // Clear schedule from DB and cancel jobs
             await Schedule.findOneAndUpdate({ type: 'main' }, { nextGameTime: null });

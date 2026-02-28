@@ -14,12 +14,12 @@ import { GameStatus, Sphere, LogEntry, Participant } from './types';
 import { SocketProvider, useSocket, globalSocket } from './contexts/SocketContext';
 import { apiService } from './services/apiService';
 
-const ScheduleSync: FC<{ setNext: (d: Date) => void, setPlayers: (n: number) => void }> = ({ setNext, setPlayers }) => {
+const ScheduleSync: FC<{ setNext: (d: Date | null) => void, setPlayers: (n: number) => void }> = ({ setNext, setPlayers }) => {
     const { socket } = useSocket();
     useEffect(() => {
         if (!socket) return;
         const handleUpdate = (data: any) => {
-            setNext(new Date(data.nextGameTime));
+            setNext(data.nextGameTime ? new Date(data.nextGameTime) : null);
             setPlayers(data.totalPlayers);
         };
         socket.on('scheduleUpdated', handleUpdate);
@@ -116,7 +116,7 @@ const App: FC = () => {
     useEffect(() => {
         apiService.getSchedule().then(data => {
             if (data) {
-                setNextGameTime(new Date(data.nextGameTime));
+                setNextGameTime(data.nextGameTime ? new Date(data.nextGameTime) : null);
                 setTotalPlayers(data.totalPlayers);
             }
         }).catch(err => console.error("Initial schedule fetch failed", err));
@@ -131,7 +131,6 @@ const App: FC = () => {
         }]);
     }, []);
 
-    const [timerId, setTimerId] = useState<number | null>(null);
 
     const enterGame = (username: string) => {
         setLoggedInUser(username);
@@ -195,27 +194,6 @@ const App: FC = () => {
         }
     }, [adminToken]);
 
-    // Auto-start timer effect
-    useEffect(() => {
-        if (gameStatus === GameStatus.WAITING && nextGameTime) {
-            const checkTime = () => {
-                const now = new Date();
-                if (now >= nextGameTime) {
-                    startGame();
-                }
-            };
-
-            const id = window.setInterval(checkTime, 1000);
-            setTimerId(id);
-
-            return () => {
-                window.clearInterval(id);
-            };
-        } else if (gameStatus !== GameStatus.WAITING && timerId) {
-            clearInterval(timerId);
-            setTimerId(null);
-        }
-    }, [gameStatus, nextGameTime, startGame, timerId]);
 
     return (
         <WalletProviders>

@@ -16,7 +16,7 @@ import { Match } from './models/Match.js';
 import { Sphere, GameStatus } from '../types.js';
 import { ARENA_WIDTH, ARENA_HEIGHT, COLOR_PALETTE } from '../constants.js';
 import { agenda } from './services/scheduler.js';
-import { initRedis, pubClient, subClient } from './services/redis.js';
+import { initRedis, isRedisConnected, pubClient, subClient } from './services/redis.js';
 
 const INSTANCE_ID = crypto.randomUUID();
 
@@ -37,7 +37,6 @@ const io = new Server(httpServer, {
         methods: ["GET", "POST"]
     }
 });
-io.adapter(createAdapter(pubClient, subClient));
 
 // Middleware
 app.use(cors());
@@ -48,26 +47,6 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
     req.io = io;
     next();
 });
-
-// Database Connection
-mongoose.connect(config.MONGODB_URI)
-    .then(async () => {
-        console.log('✅ Connected to MongoDB');
-        // Initialize Redis
-        await initRedis();
-        // Start Agenda
-        await agenda.start();
-        console.log('✅ Agenda job scheduler started');
-        // Crash recovery: cancel any matches stuck in PLAYING or GENERATING
-        const staleMatches = await Match.updateMany(
-            { status: { $in: ['PLAYING', 'GENERATING'] } },
-            { status: 'CANCELLED', cancelReason: 'Server restarted', endedAt: new Date() },
-        );
-        if (staleMatches.modifiedCount > 0) {
-            console.warn(`⚠️  Crash recovery: cancelled ${staleMatches.modifiedCount} stale match(es).`);
-        }
-    })
-    .catch(err => console.error('❌ MongoDB Connection Error:', err));
 
 // Routes (general rate limit on all /api endpoints)
 app.use('/api', generalLimiter, apiRoutes);
@@ -96,8 +75,14 @@ function rotateGameId() {
 
 // Game Loop Leader Election
 let isLeader = false;
+let redisReady = false;
 
 setInterval(async () => {
+    if (!redisReady || !isRedisConnected()) {
+        isLeader = false;
+        return;
+    }
+
     try {
         const acquired = await pubClient.set('game_engine_lock', INSTANCE_ID, { PX: 2000, NX: true });
         if (acquired) {
@@ -113,18 +98,32 @@ setInterval(async () => {
             }
         }
     } catch (e) {
-        console.error('Leader election error:', e);
+        const message = (e as Error)?.message || String(e);
+        if (!message.includes('client is closed')) {
+            console.error('Leader election error:', e);
+        }
         isLeader = false;
     }
 }, 1000);
 
 let lastTime = Date.now();
-setInterval(() => {
-    if (!isLeader) return; // Only the leader runs the physics loop
+let accumulatorMs = 0;
+const PHYSICS_STEP_MS = 50;
+const MAX_DT_MS = 250;
 
+setInterval(() => {
     const now = Date.now();
-    const dt = now - lastTime;
+
+    if (!isLeader) {
+        // Reset timing while not leader to avoid massive dt spike on leadership handoff.
+        lastTime = now;
+        accumulatorMs = 0;
+        return;
+    }
+
+    const frameDtMs = Math.min(now - lastTime, MAX_DT_MS);
     lastTime = now;
+    accumulatorMs += frameDtMs;
 
     if (serverGameState.status === GameStatus.PLAYING) {
         const context: BackendPhysicsContext = {
@@ -133,7 +132,6 @@ setInterval(() => {
             setGameStatus: (s) => { serverGameState.status = s; },
             onEvent: (ev) => {
                 io.emit('gameEvent', ev);
-                // Persist key events to Match doc
                 if (['eliminated', 'win', 'draw'].includes(ev.type)) {
                     const text = ev.type === 'win' ? `Winner: ${ev.winner}`
                         : ev.type === 'draw' ? 'Match ended in a draw'
@@ -146,7 +144,10 @@ setInterval(() => {
             }
         };
 
-        updateServerPhysicsEngine(dt, context);
+        while (accumulatorMs >= PHYSICS_STEP_MS && serverGameState.status === GameStatus.PLAYING) {
+            updateServerPhysicsEngine(PHYSICS_STEP_MS, context);
+            accumulatorMs -= PHYSICS_STEP_MS;
+        }
         serverGameState.spheres = context.currentSpheres;
 
         // Read current status after physics update (setGameStatus may have changed it)
@@ -360,8 +361,35 @@ io.on('connection', (socket: Socket) => {
     });
 });
 
-// Start Server
-const PORT = config.PORT;
-httpServer.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-});
+async function bootstrap() {
+    try {
+        await mongoose.connect(config.MONGODB_URI);
+        console.log('✅ Connected to MongoDB');
+
+        await initRedis();
+        redisReady = true;
+
+        io.adapter(createAdapter(pubClient, subClient));
+
+        await agenda.start();
+        console.log('✅ Agenda job scheduler started');
+
+        const staleMatches = await Match.updateMany(
+            { status: { $in: ['PLAYING', 'GENERATING'] } },
+            { status: 'CANCELLED', cancelReason: 'Server restarted', endedAt: new Date() },
+        );
+        if (staleMatches.modifiedCount > 0) {
+            console.warn(`⚠️  Crash recovery: cancelled ${staleMatches.modifiedCount} stale match(es).`);
+        }
+
+        const PORT = config.PORT;
+        httpServer.listen(PORT, () => {
+            console.log(`🚀 Server running on port ${PORT}`);
+        });
+    } catch (err) {
+        console.error('❌ Server bootstrap failed:', err);
+        process.exit(1);
+    }
+}
+
+bootstrap();

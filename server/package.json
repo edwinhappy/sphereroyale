@@ -6,7 +6,10 @@
     "type": "module",
     "scripts": {
         "start": "tsx index.ts",
-        "dev": "nodemon --exec tsx index.ts"
+        "dev": "nodemon --exec tsx index.ts",
+        "build": "tsc -p tsconfig.json",
+        "typecheck": "tsc -p tsconfig.json --noEmit",
+        "lint": "npm run typecheck"
     },
     "keywords": [],
     "author": "",

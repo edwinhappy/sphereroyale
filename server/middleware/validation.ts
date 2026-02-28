@@ -87,12 +87,15 @@ export const loginSchema = z.object({
  */
 export const scheduleSchema = z.object({
     nextGameTime: z
-        .string({ message: 'Next game time is required' })
-        .datetime({ message: 'nextGameTime must be a valid ISO 8601 datetime' })
-        .transform(s => new Date(s))
-        .refine(d => d.getTime() > Date.now(), {
-            message: 'nextGameTime must be in the future',
-        }),
+        .union([
+            z.string()
+                .datetime({ message: 'nextGameTime must be a valid ISO 8601 datetime' })
+                .transform(s => new Date(s))
+                .refine(d => d.getTime() > Date.now(), {
+                    message: 'nextGameTime must be in the future',
+                }),
+            z.null(),
+        ]),
 
     totalPlayers: z
         .number({ message: 'Total players must be a number' })

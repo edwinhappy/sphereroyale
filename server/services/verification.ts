@@ -1,5 +1,5 @@
 import { Connection, VersionedTransactionResponse } from '@solana/web3.js';
-import { Address } from '@ton/core';
+import { Address, Cell } from '@ton/core';
 import { config } from '../config.js';
 import { pubClient } from './redis.js';
 import { withRetry, RetryOptions } from '../utils/retry.js';
@@ -56,7 +56,8 @@ export const verifySolanaTransaction = async (
     expectedWallet: string
 ): Promise<boolean> => {
     try {
-        const cached = await pubClient.get(`tx_verify:${txHash}`);
+        const normalizedTxHash = normalizeTonTxHash(txHash);
+        const cached = await pubClient.get(`tx_verify:${normalizedTxHash}`);
         if (cached === 'true') {
             console.log(`⚡ Solana cache hit: verified ${txHash}`);
             return true;
@@ -183,9 +184,10 @@ export const verifyTonTransaction = async (
     expectedWallet: string
 ): Promise<boolean> => {
     try {
-        const cached = await pubClient.get(`tx_verify:${txHash}`);
+        const normalizedTxHash = normalizeTonTxHash(txHash);
+        const cached = await pubClient.get(`tx_verify:${normalizedTxHash}`);
         if (cached === 'true') {
-            console.log(`⚡ TON cache hit: verified ${txHash}`);
+            console.log(`⚡ TON cache hit: verified ${normalizedTxHash}`);
             return true;
         }
 
@@ -196,7 +198,7 @@ export const verifyTonTransaction = async (
 
         // Strategy 1: Use TonCenter v3 /jetton/transfers (most reliable for Jetton)
         const jettonResult = await verifyViaJettonTransfers(
-            txHash,
+            normalizedTxHash,
             normalizedSender,
             normalizedRecipient,
             normalizedJettonMaster
@@ -204,14 +206,14 @@ export const verifyTonTransaction = async (
 
         if (jettonResult !== null) {
             if (jettonResult === true) {
-                await pubClient.setEx(`tx_verify:${txHash}`, 86400, 'true');
+                await pubClient.setEx(`tx_verify:${normalizedTxHash}`, 86400, 'true');
             }
             return jettonResult;
         }
 
         // Strategy 2: Fallback to v2 /getTransactions and manual tx inspection.
         // Keep this as observability only; do NOT accept v2 fallback as strict verification.
-        await verifyViaGetTransactions(txHash, normalizedRecipient);
+        await verifyViaGetTransactions(normalizedTxHash, normalizedRecipient);
         return false;
     } catch (e) {
         console.error('TON verification error:', e);
@@ -226,6 +228,21 @@ export const verifyTonTransaction = async (
 /**
  * Normalize a TON address to raw form for reliable comparison.
  */
+
+function normalizeTonTxHash(txHash: string): string {
+    const trimmed = txHash.trim();
+    if (/^[a-fA-F0-9]{64}$/.test(trimmed)) {
+        return trimmed.toLowerCase();
+    }
+
+    try {
+        const cell = Cell.fromBase64(trimmed);
+        return cell.hash().toString('hex');
+    } catch {
+        return trimmed;
+    }
+}
+
 function normalizeTonAddress(addr: string): string {
     try {
         return Address.parse(addr).toRawString();

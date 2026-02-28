@@ -63,22 +63,6 @@ export async function verifySocketAdminToken(token: string): Promise<boolean> {
     }
 }
 
-/**
- * Check whether a token is within a grace window (≤2 min from expiry)
- * and therefore eligible for refresh. Note: Must be async now.
- */
-export async function isTokenRefreshable(token: string): Promise<boolean> {
-    try {
-        const payload = await verifyAdminToken(token);
-        const now = Math.floor(Date.now() / 1000);
-        const remaining = payload.exp - now;
-        // Allow refresh when ≤ 2 minutes remain
-        return remaining > 0 && remaining <= 120;
-    } catch {
-        return false;
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Express middleware
 // ---------------------------------------------------------------------------

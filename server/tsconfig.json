@@ -7,9 +7,13 @@
         "strict": true,
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
-        "outDir": "./dist"
+        "outDir": "./dist",
+        "types": [
+            "node"
+        ]
     },
     "include": [
-        "**/*.ts"
+        "**/*.ts",
+        "**/*.d.ts"
     ]
 }

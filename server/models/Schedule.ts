@@ -2,14 +2,14 @@ import mongoose, { Document, Model } from 'mongoose';
 
 export interface ISchedule extends Document {
     type: string;
-    nextGameTime: Date;
+    nextGameTime: Date | null;
     totalPlayers: number;
     updatedAt: Date;
 }
 
 const scheduleSchema = new mongoose.Schema<ISchedule>({
-    type: { type: String, required: true, unique: true, default: 'main' }, // Ensures only one config entry if needed
-    nextGameTime: { type: Date, required: true },
+    type: { type: String, required: true, unique: true, default: 'main' },
+    nextGameTime: { type: Date, default: null },
     totalPlayers: { type: Number, required: true },
     updatedAt: { type: Date, default: Date.now }
 });

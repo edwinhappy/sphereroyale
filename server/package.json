@@ -1,0 +1,32 @@
+{
+    "name": "sphere-royale-server",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "type": "module",
+    "scripts": {
+        "start": "tsx index.ts",
+        "dev": "nodemon --exec tsx index.ts"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "@solana/web3.js": "^1.98.4",
+        "@ton/core": "^0.63.1",
+        "@ton/ton": "^16.2.2",
+        "cors": "^2.8.5",
+        "dotenv": "^16.4.5",
+        "express": "^4.19.2",
+        "mongoose": "^8.3.2",
+        "socket.io": "^4.7.5"
+    },
+    "devDependencies": {
+        "@types/cors": "^2.8.19",
+        "@types/express": "^5.0.6",
+        "@types/node": "^25.3.0",
+        "nodemon": "^3.1.11",
+        "tsx": "^4.21.0",
+        "typescript": "^5.9.3"
+    }
+}

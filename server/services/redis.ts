@@ -1,20 +1,31 @@
 import { createClient } from 'redis';
 import { config } from '../config.js';
 
-export const pubClient = createClient({ url: config.REDIS_URI });
-export const subClient = pubClient.duplicate();
+const REDIS_CONNECT_TIMEOUT_MS = 5_000;
+
+export const pubClient = createClient({
+    url: config.REDIS_URI,
+    socket: {
+        connectTimeout: REDIS_CONNECT_TIMEOUT_MS,
+        reconnectStrategy: () => false, // fail fast; avoid infinite reconnect spam
+    },
+});
+
+export const subClient = pubClient.duplicate({
+    socket: {
+        connectTimeout: REDIS_CONNECT_TIMEOUT_MS,
+        reconnectStrategy: () => false,
+    },
+});
+
+export const isRedisConnected = () => pubClient.isOpen && subClient.isOpen;
 
 export const initRedis = async () => {
-    try {
-        await Promise.all([
-            pubClient.connect(),
-            subClient.connect()
-        ]);
-        console.log('✅ Connected to Redis (Pub/Sub)');
-    } catch (error) {
-        console.error('❌ Redis Connection Error:', error);
-        process.exit(1);
-    }
+    await Promise.all([
+        pubClient.connect(),
+        subClient.connect(),
+    ]);
+    console.log('✅ Connected to Redis (Pub/Sub)');
 };
 
 pubClient.on('error', (err: unknown) => console.error('Redis Pub Client Error:', err));

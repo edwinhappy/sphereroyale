@@ -27,7 +27,9 @@ const Registration: FC<RegistrationProps> = ({ onStart, onOpenLogin }) => {
     const [participants, setParticipants] = useState<Participant[]>(() =>
         storageService.loadParticipants()
     );
-    const [isPaying, setIsPaying] = useState(false);
+
+    type TxStatus = 'IDLE' | 'AWAITING_WALLET_APPROVAL' | 'CONFIRMING_TX' | 'REGISTERING_WITH_SERVER' | 'SUCCESS';
+    const [txStatus, setTxStatus] = useState<TxStatus>('IDLE');
 
     const { showToast } = useToast();
 
@@ -52,10 +54,11 @@ const Registration: FC<RegistrationProps> = ({ onStart, onOpenLogin }) => {
 
     const isWalletConnected = walletAddress.length > 0;
 
-    const canRegister = username.trim().length > 0 && isWalletConnected && !isPaying;
+    const canRegister = username.trim().length > 0 && isWalletConnected && (txStatus === 'IDLE' || txStatus === 'SUCCESS');
 
     const handlePayAndRegister = async () => {
-        if (!canRegister || !selectedChain) return;
+        // Strict Race Condition Guard
+        if (!canRegister || !selectedChain || txStatus !== 'IDLE' && txStatus !== 'SUCCESS') return;
 
         // Validation Checks
         const walletParticipants = participants.filter(p => p.walletAddress === walletAddress);
@@ -70,7 +73,7 @@ const Registration: FC<RegistrationProps> = ({ onStart, onOpenLogin }) => {
             return;
         }
 
-        setIsPaying(true);
+        setTxStatus('AWAITING_WALLET_APPROVAL');
 
         try {
             let txHash: string;
@@ -79,8 +82,18 @@ const Registration: FC<RegistrationProps> = ({ onStart, onOpenLogin }) => {
 
             if (selectedChain === 'TON') {
                 txHash = await sendTonUSDT(tonConnectUI, REGISTRATION_FEE_USDT, comment);
+                // TON extension returns immediately on approval, latency happens on backend verification
+                setTxStatus('REGISTERING_WITH_SERVER');
             } else {
-                txHash = await sendSolanaUSDT(solConnection, solWallet, REGISTRATION_FEE_USDT, comment);
+                txHash = await sendSolanaUSDT(
+                    solConnection,
+                    solWallet,
+                    REGISTRATION_FEE_USDT,
+                    comment,
+                    (status) => setTxStatus(status)
+                );
+                // Solana's wait finishes when the finality is 'confirmed'
+                setTxStatus('REGISTERING_WITH_SERVER');
             }
 
             const newParticipant: Participant = {
@@ -97,11 +110,11 @@ const Registration: FC<RegistrationProps> = ({ onStart, onOpenLogin }) => {
             setParticipants(prev => [...prev, newParticipant]);
 
             setUsername('');
+            setTxStatus('SUCCESS');
             showToast('Registration complete! Sector access granted.', 'success');
         } catch (err: unknown) {
+            setTxStatus('IDLE');
             errorHandler(err, (msg, type) => showToast(msg, type));
-        } finally {
-            setIsPaying(false);
         }
     };
 
@@ -201,9 +214,9 @@ const Registration: FC<RegistrationProps> = ({ onStart, onOpenLogin }) => {
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && handlePayAndRegister()}
-                                    className="w-full bg-cyber-panel/50 border border-white/10 text-white p-4 rounded-lg focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all font-sans placeholder-gray-600"
+                                    className="w-full bg-cyber-panel/50 border border-white/10 text-white p-4 rounded-lg focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all font-sans placeholder-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                                     placeholder="Enter your codename"
-                                    disabled={isPaying}
+                                    disabled={txStatus !== 'IDLE' && txStatus !== 'SUCCESS'}
                                 />
                             </div>
                         )}
@@ -214,22 +227,23 @@ const Registration: FC<RegistrationProps> = ({ onStart, onOpenLogin }) => {
                             <button
                                 onClick={handlePayAndRegister}
                                 disabled={!canRegister}
-                                className={`w-full py-4 font-sans font-bold text-sm uppercase tracking-wider rounded-lg transition-all relative overflow-hidden ${canRegister
+                                className={`w-full py-4 font-sans font-bold text-sm uppercase tracking-wider rounded-lg transition-all relative overflow-hidden flex items-center justify-center gap-3 ${canRegister
                                     ? 'bg-white text-black hover:bg-gray-200 hover:scale-[1.02] shadow-[0_0_20px_rgba(255,255,255,0.1)] cursor-pointer'
                                     : 'bg-white/5 border border-white/10 text-gray-500 cursor-not-allowed'
                                     }`}
                             >
-                                {isPaying ? (
-                                    <span className="flex items-center justify-center gap-3">
-                                        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                        </svg>
-                                        Awaiting Wallet Confirmation…
-                                    </span>
-                                ) : (
-                                    `Pay ${REGISTRATION_FEE_USDT} USDT & Register`
+                                {txStatus !== 'IDLE' && txStatus !== 'SUCCESS' && (
+                                    <svg className="animate-spin h-5 w-5 text-current" viewBox="0 0 24 24" fill="none">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                    </svg>
                                 )}
+                                <span>
+                                    {txStatus === 'IDLE' || txStatus === 'SUCCESS' ? `Pay ${REGISTRATION_FEE_USDT} USDT & Register` :
+                                        txStatus === 'AWAITING_WALLET_APPROVAL' ? 'Awaiting Wallet Signature…' :
+                                            txStatus === 'CONFIRMING_TX' ? 'Confirming on Blockchain…' :
+                                                'Verifying via Server Protocol…'}
+                                </span>
                             </button>
                         )}
                     </div>

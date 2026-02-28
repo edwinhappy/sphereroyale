@@ -20,7 +20,15 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const [isConnected, setIsConnected] = useState(false);
 
     useEffect(() => {
-        const newSocket = io('http://localhost:3001', {
+        // 1. Explicit VITE_WS_URL environment variable
+        // 2. Localhost fallback for standard vite dev server
+        // 3. Current host with ws:// or wss:// depending on protocol
+        const socketUrl = import.meta.env.VITE_WS_URL ||
+            (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                ? 'http://localhost:3001'
+                : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`);
+
+        const newSocket = io(socketUrl, {
             transports: ['websocket'], // force websocket for performance
         });
 

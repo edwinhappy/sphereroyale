@@ -128,7 +128,8 @@ export async function sendSolanaUSDT(
     connection: Connection,
     wallet: WalletContextState,
     amountUSDT: number,
-    comment?: string
+    comment?: string,
+    onStatusChange?: (status: 'CONFIRMING_TX') => void
 ): Promise<string> {
     if (!SOL_RECIPIENT_ADDRESS || !SOL_USDT_MINT) {
         throw new Error('Solana payment configuration missing. Check .env file.');
@@ -179,6 +180,11 @@ export async function sendSolanaUSDT(
     transaction.recentBlockhash = blockhash;
 
     const signature = await wallet.sendTransaction(transaction, connection);
+
+    // Transition state immediately after wallet signature resolves
+    if (onStatusChange) {
+        onStatusChange('CONFIRMING_TX');
+    }
 
     // Wait for confirmation
     await connection.confirmTransaction(signature, 'confirmed');

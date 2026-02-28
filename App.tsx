@@ -88,6 +88,28 @@ const App: FC = () => {
         else localStorage.removeItem('app_adminToken');
     }, [adminToken]);
 
+    // Auto-refresh admin JWT before expiry (every 12 min for a 15-min token)
+    useEffect(() => {
+        if (!adminToken || !isAdmin) return;
+
+        const refreshInterval = setInterval(() => {
+            apiService.refreshToken(adminToken)
+                .then(({ token }) => {
+                    setAdminToken(token);
+                })
+                .catch(() => {
+                    // Token expired or invalid — force re-login
+                    console.warn('Admin token refresh failed — logging out');
+                    setAdminToken(null);
+                    setIsAdmin(false);
+                    setLoggedInUser(null);
+                    setView('LANDING');
+                });
+        }, 3 * 60 * 1000); // 3 minutes
+
+        return () => clearInterval(refreshInterval);
+    }, [adminToken, isAdmin]);
+
     const [, setTotalPlayers] = useState<number>(8); // Default 8
 
     // Init schedule
@@ -216,6 +238,9 @@ const App: FC = () => {
                             <AdminDashboard
                                 adminToken={adminToken}
                                 onLogout={() => {
+                                    if (adminToken) {
+                                        apiService.adminLogout(adminToken).catch(console.error);
+                                    }
                                     setLoggedInUser(null);
                                     setAdminToken(null);
                                     setView('LANDING');

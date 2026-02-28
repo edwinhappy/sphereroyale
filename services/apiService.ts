@@ -1,6 +1,13 @@
 import { Participant } from '../types';
 
-const API_Base_URL = 'http://localhost:3001/api';
+// Determine API Base URL dynamically
+// 1. Check for explicit environment variable (VITE_API_URL)
+// 2. If missing, assume API is hosted on the same origin under /api (production/staging)
+// 3. Fallback to localhost:3001/api for local frontend-only dev server running without env vars
+const API_Base_URL = import.meta.env.VITE_API_URL ||
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'http://localhost:3001/api'
+        : `${window.location.origin}/api`);
 
 export const apiService = {
     getParticipants: async (): Promise<Participant[]> => {
@@ -28,7 +35,7 @@ export const apiService = {
         return response.json();
     },
 
-    adminLogin: async (password: string): Promise<string> => {
+    adminLogin: async (password: string): Promise<{ token: string; expiresIn: string }> => {
         const response = await fetch(`${API_Base_URL}/admin/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -38,12 +45,13 @@ export const apiService = {
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.error || 'Admin login failed');
         }
-        const data = await response.json();
-        return data.token;
+        return response.json();
     },
 
     getAdminStats: async (token: string): Promise<{ activeConnections: number, networkLoad: number, uptime: number }> => {
-        const response = await fetch(`${API_Base_URL}/admin/stats?token=${token}`);
+        const response = await fetch(`${API_Base_URL}/admin/stats`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
         if (!response.ok) {
             throw new Error('Failed to fetch admin stats');
         }
@@ -60,13 +68,41 @@ export const apiService = {
     updateSchedule: async (nextGameTime: Date, totalPlayers: number, token: string): Promise<any> => {
         const response = await fetch(`${API_Base_URL}/schedule`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ nextGameTime: nextGameTime.toISOString(), totalPlayers, token }),
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({ nextGameTime: nextGameTime.toISOString(), totalPlayers }),
         });
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.error || 'Failed to update schedule');
         }
         return response.json();
+    },
+
+    refreshToken: async (currentToken: string): Promise<{ token: string; expiresIn: string }> => {
+        const response = await fetch(`${API_Base_URL}/admin/refresh`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${currentToken}`,
+            },
+        });
+        if (!response.ok) {
+            throw new Error('Token refresh failed');
+        }
+        return response.json();
+    },
+
+    adminLogout: async (token: string): Promise<void> => {
+        const response = await fetch(`${API_Base_URL}/admin/logout`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+            }
+        });
+        if (!response.ok) {
+            console.warn('Backend logout rejection warning, proceeding with client purge regardless');
+        }
     }
 };

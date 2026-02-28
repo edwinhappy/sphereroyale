@@ -56,7 +56,7 @@ const LoginModal: FC<LoginModalProps> = ({ isOpen, onClose, onLogin, onSignup })
         if (isAdminLogin) {
             setIsAuthenticating(true);
             try {
-                const token = await apiService.adminLogin(password);
+                const { token } = await apiService.adminLogin(password);
                 onLogin(username, true, token);
                 onClose();
             } catch (error: any) {

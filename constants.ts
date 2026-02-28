@@ -8,18 +8,21 @@ export const MIN_SPEED_DAMAGE_THRESHOLD = 2;
 export const DAMAGE_MULTIPLIER = 2.5;
 export const MAX_PARTICLES = 100;
 
-// --- Payment Configuration (from .env) ---
+// --- Payment Configuration (from .env via Vite) ---
+// Guarded for Node.js compatibility — the server reads these from process.env instead.
+const viteEnv = (typeof import.meta !== 'undefined' && import.meta.env) || {} as Record<string, string>;
+
 export const REGISTRATION_FEE_USDT = 2;
 // @ts-ignore
-export const TON_USDT_JETTON_MASTER = import.meta.env.VITE_TON_USDT_JETTON_MASTER ?? '';
+export const TON_USDT_JETTON_MASTER = viteEnv.VITE_TON_USDT_JETTON_MASTER ?? '';
 // @ts-ignore
-export const SOL_USDT_MINT = import.meta.env.VITE_SOL_USDT_MINT ?? '';
+export const SOL_USDT_MINT = viteEnv.VITE_SOL_USDT_MINT ?? '';
 // @ts-ignore
-export const TON_RECIPIENT_ADDRESS = import.meta.env.VITE_TON_RECIPIENT_ADDRESS ?? '';
+export const TON_RECIPIENT_ADDRESS = viteEnv.VITE_TON_RECIPIENT_ADDRESS ?? '';
 // @ts-ignore
-export const SOL_RECIPIENT_ADDRESS = import.meta.env.VITE_SOL_RECIPIENT_ADDRESS ?? '';
+export const SOL_RECIPIENT_ADDRESS = viteEnv.VITE_SOL_RECIPIENT_ADDRESS ?? '';
 // @ts-ignore
-export const SOL_RPC_ENDPOINT = import.meta.env.VITE_SOL_RPC_ENDPOINT ?? 'https://api.mainnet-beta.solana.com';
+export const SOL_RPC_ENDPOINT = viteEnv.VITE_SOL_RPC_ENDPOINT ?? 'https://api.mainnet-beta.solana.com';
 
 export const COLOR_PALETTE = [
     '#ef4444', // Red

@@ -12,18 +12,26 @@
     "author": "",
     "license": "ISC",
     "dependencies": {
+        "@socket.io/redis-adapter": "^8.3.0",
         "@solana/web3.js": "^1.98.4",
         "@ton/core": "^0.63.1",
         "@ton/ton": "^16.2.2",
+        "agenda": "^6.2.3",
         "cors": "^2.8.5",
         "dotenv": "^16.4.5",
         "express": "^4.19.2",
+        "express-rate-limit": "^8.2.1",
+        "jsonwebtoken": "^9.0.3",
         "mongoose": "^8.3.2",
-        "socket.io": "^4.7.5"
+        "redis": "^5.11.0",
+        "socket.io": "^4.7.5",
+        "zod": "^4.3.6"
     },
     "devDependencies": {
+        "@types/agenda": "^3.0.2",
         "@types/cors": "^2.8.19",
         "@types/express": "^5.0.6",
+        "@types/jsonwebtoken": "^9.0.10",
         "@types/node": "^25.3.0",
         "nodemon": "^3.1.11",
         "tsx": "^4.21.0",

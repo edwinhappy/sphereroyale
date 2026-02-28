@@ -32,12 +32,14 @@ const AdminDashboard: FC<AdminDashboardProps> = ({ adminToken, onLogout, onNavig
             const fetchStats = () => {
                 apiService.getAdminStats(adminToken)
                     .then(data => setAdminStats(data))
-                    .catch(err => console.error("Failed to load admin stats:", err));
+                    .catch(err => console.error('Failed to load admin stats:', err));
             };
             fetchStats();
             const interval = setInterval(fetchStats, 5000);
             return () => clearInterval(interval);
         }
+
+        return undefined;
     }, [activeTab, adminToken]);
 
     // Format uptime
@@ -112,13 +114,7 @@ const AdminDashboard: FC<AdminDashboardProps> = ({ adminToken, onLogout, onNavig
             return;
         }
 
-        // Pad with leading zeros for ISO string
-        const pad = (n: number) => String(n).padStart(2, '0');
-
-        // Construct ISO string with +03:00 offset
-        // YYYY-MM-DDTHH:mm:00+03:00
-        const isoString = `${y}-${pad(m)}-${pad(d)}T${pad(h)}:${pad(min)}:00+03:00`;
-        const date = new Date(isoString);
+        const date = new Date(y, m - 1, d, h, min, 0, 0);
 
         if (!isNaN(date.getTime()) && adminToken) {
             apiService.updateSchedule(date, count, adminToken)

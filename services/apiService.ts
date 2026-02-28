@@ -58,7 +58,7 @@ export const apiService = {
         return response.json();
     },
 
-    getSchedule: async (): Promise<{ nextGameTime: string, totalPlayers: number } | null> => {
+    getSchedule: async (): Promise<{ nextGameTime: string | null, totalPlayers: number } | null> => {
         const response = await fetch(`${API_Base_URL}/schedule`);
         if (response.status === 404) return null;
         if (!response.ok) throw new Error('Failed to fetch schedule');
@@ -90,6 +90,20 @@ export const apiService = {
         });
         if (!response.ok) {
             throw new Error('Token refresh failed');
+        }
+        return response.json();
+    },
+
+
+    verifyParticipantAccess: async (username: string): Promise<{ ok: boolean; username: string; gameId: string }> => {
+        const response = await fetch(`${API_Base_URL}/auth/participant`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username }),
+        });
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || 'Participant access denied');
         }
         return response.json();
     },

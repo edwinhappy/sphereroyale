@@ -67,9 +67,18 @@ const LoginModal: FC<LoginModalProps> = ({ isOpen, onClose, onLogin, onSignup })
             return;
         }
 
-        if (username.trim()) {
-            onLogin(username, false);
-            onClose();
+        const normalizedUsername = username.trim().toLowerCase();
+        if (normalizedUsername) {
+            setIsAuthenticating(true);
+            try {
+                await apiService.verifyParticipantAccess(normalizedUsername);
+                onLogin(normalizedUsername, false);
+                onClose();
+            } catch (error: any) {
+                alert(error.message || 'Player not registered for the current game');
+            } finally {
+                setIsAuthenticating(false);
+            }
         }
     };
 

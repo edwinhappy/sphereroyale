@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "typecheck:server": "npm --prefix server run typecheck",
+    "lint": "npm run typecheck && npm run typecheck:server"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.14",

@@ -2,14 +2,9 @@
   "compilerOptions": {
     "target": "ES2020",
     "useDefineForClassFields": true,
-    "lib": [
-      "ES2020",
-      "DOM",
-      "DOM.Iterable"
-    ],
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
-    /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
@@ -18,23 +13,26 @@
     "jsx": "react-jsx",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    /* Linting */
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "noImplicitOverride": true
   },
   "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    "vite-env.d.ts"
+    "App.tsx",
+    "index.tsx",
+    "vite-env.d.ts",
+    "types.ts",
+    "constants.ts",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "contexts/**/*.ts",
+    "contexts/**/*.tsx",
+    "services/**/*.ts",
+    "services/**/*.tsx"
   ],
-  "references": [
-    {
-      "path": "./tsconfig.node.json"
-    }
-  ],
-  "exclude": [
-    "vite.config.ts"
-  ]
+  "references": [{ "path": "./tsconfig.node.json" }],
+  "exclude": ["vite.config.ts", "server/**", "docs/**", "node_modules/**"]
 }

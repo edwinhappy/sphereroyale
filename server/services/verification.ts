@@ -209,15 +209,10 @@ export const verifyTonTransaction = async (
             return jettonResult;
         }
 
-        // Strategy 2: Fallback to v2 /getTransactions and manual tx inspection
-        const fallbackResult = await verifyViaGetTransactions(
-            txHash,
-            normalizedRecipient
-        );
-        if (fallbackResult) {
-            await pubClient.setEx(`tx_verify:${txHash}`, 86400, 'true');
-        }
-        return fallbackResult;
+        // Strategy 2: Fallback to v2 /getTransactions and manual tx inspection.
+        // Keep this as observability only; do NOT accept v2 fallback as strict verification.
+        await verifyViaGetTransactions(txHash, normalizedRecipient);
+        return false;
     } catch (e) {
         console.error('TON verification error:', e);
         return false;
